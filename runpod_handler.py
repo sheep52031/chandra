@@ -51,7 +51,9 @@ def process_pdf_bytes(pdf_bytes: bytes, page_range: List[int] = None) -> List[Im
 
     try:
         # Use Chandra's PDF processing
-        images = load_pdf_images(tmp_path, page_range or [])
+        # IMPORTANT: Pass None (not []) when page_range is not specified
+        # Empty list [] means "process zero pages", None means "process all pages"
+        images = load_pdf_images(tmp_path, page_range if page_range else None)
         return images
     finally:
         # Clean up temporary file
