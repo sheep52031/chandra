@@ -185,18 +185,8 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
 
         print(f"Total images to process: {len(all_images)}")
 
-        # Create batch input items
-        batch = []
-        for pil_image in all_images:
-            batch_item = BatchInputItem(
-                image=pil_image,
-                prompt_type=prompt_type,
-                prompt=custom_prompt
-            )
-            batch.append(batch_item)
-
-        # Run inference
-        print("Running OCR inference...")
+        # Run inference on each page individually with progress logging
+        print(f"Running OCR inference on {len(all_images)} page(s)...")
         generate_kwargs = {
             "include_images": include_images,
             "include_headers_footers": include_headers_footers,
@@ -205,7 +195,22 @@ def handler(event: Dict[str, Any]) -> Dict[str, Any]:
         if max_output_tokens is not None:
             generate_kwargs["max_output_tokens"] = max_output_tokens
 
-        results = model.generate(batch, **generate_kwargs)
+        results = []
+        for idx, pil_image in enumerate(all_images):
+            print(f"Processing page {idx + 1}/{len(all_images)}...")
+
+            # Create single-item batch
+            batch_item = BatchInputItem(
+                image=pil_image,
+                prompt_type=prompt_type,
+                prompt=custom_prompt
+            )
+
+            # Process single page
+            page_results = model.generate([batch_item], **generate_kwargs)
+            results.extend(page_results)
+
+            print(f"✓ Page {idx + 1}/{len(all_images)} completed ({page_results[0].token_count} tokens)")
 
         # Convert results to serializable format
         output_results = []
