@@ -1,0 +1,54 @@
+# RunPod Serverless Dockerfile for Chandra OCR (Fixed Version)
+# 修復重點:
+# 1. 移除 flash-attention (Optional,會導致 Build 超時)
+# 2. 確保 Lazy Loading Handler
+# 3. 正確的環境變數配置
+
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV TORCH_HOME=/runpod-volume/.cache/torch
+ENV HF_HOME=/runpod-volume/.cache/huggingface
+ENV MODEL_CHECKPOINT=datalab-to/chandra
+ENV TORCH_DEVICE=cuda
+ENV MAX_OUTPUT_TOKENS=12384
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    git \
+    wget \
+    curl \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip3 install --no-cache-dir --upgrade pip
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY . /app/
+
+# Install Python dependencies
+# ✅ 移除 flash-attn (Optional,會導致 Build 超時)
+RUN pip3 install --no-cache-dir -e . && \
+    pip3 install --no-cache-dir runpod requests
+
+# Create cache directories
+RUN mkdir -p /runpod-volume/.cache/torch /runpod-volume/.cache/huggingface
+
+# ✅ 確保使用 Lazy Loading Handler
+# Model 會在首次請求時載入,不會在 Container Init 時載入
+
+# Set the entrypoint
+CMD ["python3", "-u", "runpod_handler.py"]
