@@ -46,7 +46,7 @@ jobs:
           file: ./Dockerfile.fixed
           platforms: linux/amd64
           push: true
-          tags: sheep52031/chandra-runpod:v2-preloaded
+          tags: sheep52031/chandra-runpod:v2-lazy-loading
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |

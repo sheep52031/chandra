@@ -1,7 +1,7 @@
-# RunPod Serverless Dockerfile for Chandra OCR (Pre-downloaded Model Version)
+# RunPod Serverless Dockerfile for Chandra OCR (Lazy Loading Version)
 # 修復重點:
 # 1. 移除 flash-attention (Optional,會導致 Build 超時)
-# 2. 預先下載 Model 到 Image 內 (避免冷啟動下載 134 秒)
+# 2. 移除 Model 預下載 (改用 RunPod Runtime 下載,利用優化網路 60MB/s)
 # 3. 正確的環境變數配置
 
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
@@ -47,16 +47,12 @@ RUN pip3 install --no-cache-dir -e . && \
 # Create cache directories
 RUN mkdir -p /app/.cache/torch /app/.cache/huggingface
 
-# ✅ 預先下載 Chandra Model (避免冷啟動時下載 8GB Model)
-# 這會增加 Docker Image 大小到 ~15GB，但冷啟動從 2 分鐘降到 15-20 秒
-RUN python3 -c "\
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor; \
-import os; \
-os.environ['HF_HOME'] = '/app/.cache/huggingface'; \
-print('Downloading Chandra model...'); \
-model = Qwen2VLForConditionalGeneration.from_pretrained('datalab-to/chandra', cache_dir='/app/.cache/huggingface'); \
-processor = AutoProcessor.from_pretrained('datalab-to/chandra', cache_dir='/app/.cache/huggingface'); \
-print('Model downloaded successfully!')"
+# ✅ 移除 Model 預下載 (改用 Lazy Loading)
+# 理由:
+# 1. GitHub Actions 磁碟空間不足 (14GB vs 22GB 需求)
+# 2. RunPod Runtime 下載更快 (60 MB/s 優化網路 vs 5-10 MB/s GitHub)
+# 3. 首次冷啟動 2 分鐘可接受,後續啟動 15-20 秒
+# Model 會在 runpod_handler.py 首次請求時自動下載
 
 # Set the entrypoint
 CMD ["python3", "-u", "runpod_handler.py"]
