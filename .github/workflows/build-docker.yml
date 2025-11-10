@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # 增加 timeout 到 60 分鐘 (預設 30 分鐘可能不夠)
 
     steps:
       - name: Checkout code
@@ -30,6 +31,8 @@ jobs:
           file: ./Dockerfile.fixed
           platforms: linux/amd64
           push: true
-          tags: sheep52031/chandra-runpod:fixed-amd64
+          tags: sheep52031/chandra-runpod:v2-preloaded
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1

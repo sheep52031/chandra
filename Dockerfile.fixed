@@ -1,7 +1,7 @@
-# RunPod Serverless Dockerfile for Chandra OCR (Fixed Version)
+# RunPod Serverless Dockerfile for Chandra OCR (Pre-downloaded Model Version)
 # 修復重點:
 # 1. 移除 flash-attention (Optional,會導致 Build 超時)
-# 2. 確保 Lazy Loading Handler
+# 2. 預先下載 Model 到 Image 內 (避免冷啟動下載 134 秒)
 # 3. 正確的環境變數配置
 
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
@@ -9,8 +9,8 @@ FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
-ENV TORCH_HOME=/runpod-volume/.cache/torch
-ENV HF_HOME=/runpod-volume/.cache/huggingface
+ENV TORCH_HOME=/app/.cache/torch
+ENV HF_HOME=/app/.cache/huggingface
 ENV MODEL_CHECKPOINT=datalab-to/chandra
 ENV TORCH_DEVICE=cuda
 ENV MAX_OUTPUT_TOKENS=12384
@@ -45,10 +45,18 @@ RUN pip3 install --no-cache-dir -e . && \
     pip3 install --no-cache-dir runpod requests
 
 # Create cache directories
-RUN mkdir -p /runpod-volume/.cache/torch /runpod-volume/.cache/huggingface
+RUN mkdir -p /app/.cache/torch /app/.cache/huggingface
 
-# ✅ 確保使用 Lazy Loading Handler
-# Model 會在首次請求時載入,不會在 Container Init 時載入
+# ✅ 預先下載 Chandra Model (避免冷啟動時下載 8GB Model)
+# 這會增加 Docker Image 大小到 ~15GB，但冷啟動從 2 分鐘降到 15-20 秒
+RUN python3 -c "\
+from transformers import Qwen2VLForConditionalGeneration, AutoProcessor; \
+import os; \
+os.environ['HF_HOME'] = '/app/.cache/huggingface'; \
+print('Downloading Chandra model...'); \
+model = Qwen2VLForConditionalGeneration.from_pretrained('datalab-to/chandra', cache_dir='/app/.cache/huggingface'); \
+processor = AutoProcessor.from_pretrained('datalab-to/chandra', cache_dir='/app/.cache/huggingface'); \
+print('Model downloaded successfully!')"
 
 # Set the entrypoint
 CMD ["python3", "-u", "runpod_handler.py"]
